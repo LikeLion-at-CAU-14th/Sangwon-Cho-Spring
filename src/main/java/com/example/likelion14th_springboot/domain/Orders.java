@@ -25,7 +25,7 @@ public class Orders extends BaseTimeEntity {
     private DeliverStatus deliverStatus; // 배송상태
 
     @ManyToOne
-    @JoinColumn(name ="buyer_id")
+    @JoinColumn(name = "buyer_id")
     private Member buyer;
 
     @OneToMany(mappedBy = "orders", cascade = CascadeType.ALL)
@@ -33,4 +33,40 @@ public class Orders extends BaseTimeEntity {
 
     @OneToOne(mappedBy = "orders", cascade = CascadeType.ALL)
     private Coupon coupon;
+
+    @Embedded
+    private ShippingAddress shippingAddress;
+
+    @Embeddable
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ShippingAddress {
+        private String recipient;//수령인
+        private String phoneNumber; //전화번호
+        private String streetAddress;//도로명주소
+        private String detailAddress; //상세주소
+        private String postalCode; //우편번호
+    }
+
+    public void updateShippingAddress(ShippingAddress newAddress) {
+        if (this.deliverStatus != DeliverStatus.PREPARATION) {
+            throw new IllegalArgumentException("배송 준비 중에만 배송정보를 수정할 수 있습니다.");
+        }
+
+        this.shippingAddress = newAddress;
+    }
+
+    @Builder.Default
+    private boolean deleted = false;
+
+    public void softDelete() {
+        if (this.deliverStatus != DeliverStatus.COMPLETED) {
+            throw new IllegalArgumentException("배송 완료된 주문만 삭제할 수 있습니다.");
+        }
+
+        this.deleted = true;
+    }
+
+
 }

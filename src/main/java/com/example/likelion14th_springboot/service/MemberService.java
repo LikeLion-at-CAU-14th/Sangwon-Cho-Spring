@@ -22,7 +22,7 @@ public class MemberService {
     public void join(JoinRequestDto joinRequestDto) {
         // 해당 name이 이미 존재하는 경우
         if (memberRepository.existsByName(joinRequestDto.getName())) {
-            return; // 나중에 예외 처리
+            throw new IllegalArgumentException("이미 사용중인 이름입니다.");
         }
 
         // 유저 객체 생성

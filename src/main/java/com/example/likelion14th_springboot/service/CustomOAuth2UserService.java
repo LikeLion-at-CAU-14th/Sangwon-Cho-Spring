@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -28,10 +29,26 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         //
 
         OAuth2User oAuth2User = super.loadUser(userRequest);
+//        System.out.println("OAuth attributes = " + oAuth2User.getAttributes());
 
-        String email = oAuth2User.getAttribute("email");
-        String username = oAuth2User.getAttribute("name");
 
+//        String email = oAuth2User.getAttribute("email");
+//        String username = oAuth2User.getAttribute("name");
+        String registrationId = userRequest.getClientRegistration().getRegistrationId();
+
+        String email;
+        String username;
+
+        if ("kakao".equals(registrationId)) {
+            Map<String, Object> kakaoAccount = oAuth2User.getAttribute("kakao_account");
+            Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
+
+            email = (String) kakaoAccount.get("email");
+            username = (String) profile.get("nickname");
+        } else {
+            email = oAuth2User.getAttribute("email");
+            username = oAuth2User.getAttribute("name");
+        }
 
         Member member = memberRepository.findByEmail(email)
                 .orElseGet(() -> Member.builder()
@@ -45,9 +62,14 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             memberRepository.save(member);
         }
 
+        String userNameAttributeName = userRequest.getClientRegistration()
+                .getProviderDetails()
+                .getUserInfoEndpoint()
+                .getUserNameAttributeName();
+
         return new DefaultOAuth2User(
                 Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")),
                 oAuth2User.getAttributes(),
-                "email");
+                userNameAttributeName);
     }
 }

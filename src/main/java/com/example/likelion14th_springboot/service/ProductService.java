@@ -39,6 +39,18 @@ public class ProductService {
         return new ProductResponseDto(saved.getId(), saved.getName(), saved.getPrice(), saved.getStock(), saved.getDescription());
     }
 
+    public List<ProductResponseDto> getMyProducts(String email) {
+        Member member = memberRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자"));
+
+        if (!member.isSeller()) {
+            throw new IllegalArgumentException("판매자만 조회할 수 있습니다.");
+        }
+
+        return productRepository.findAllBySellerEmail(member.getEmail()).stream()
+                .map(ProductResponseDto::fromEntity)
+                .toList();
+    }
+
     // 1. 모든 상품 목록 가져오기
     public List<ProductResponseDto> getAllProducts() {
         return productRepository.findAll().stream()

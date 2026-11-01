@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    include: secret
   datasource:
     url: jdbc:h2:tcp://localhost/~/test-likelion # Home 디렉터리에 저장되는 H2 파일 데이터베이스
     driver-class-name: org.h2.Driver # H2 드라이버 클래스
@@ -17,3 +19,35 @@ spring:
   sql:
     init:
       mode: always # 애플리케이션 시작 시 스크립트 초기화 (기본값: embedded)
+  config:
+    import: optional:application-secret.yml
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: GOOGLE_CLIENT_ID
+            client-secret: GOOGLE_CLIENT_SECRET
+            scope:
+              - email
+              - profile
+            redirect-uri: "http://localhost:8080/login/oauth2/code/google"
+          kakao:
+            provider: kakao
+            client-id: KAKAO_CLIENT_ID
+            client-secret: KAKAO_CLIENT_SECRET
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: "http://localhost:8080/login/oauth2/code/kakao"
+            scope:
+              - profile_nickname
+              - account_email
+            client-name: Kakao
+
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id

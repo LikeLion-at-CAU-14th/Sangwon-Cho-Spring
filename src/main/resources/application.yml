@@ -52,3 +52,6 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+# 테스트 전용 더미 값 (실제 운영 시크릿과 무관, CI에서 사용)
+jwt:
+  secret: test-only-dummy-jwt-secret-key-for-ci-do-not-use-in-production

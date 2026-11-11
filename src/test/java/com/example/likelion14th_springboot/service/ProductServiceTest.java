@@ -26,16 +26,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith(MockitoExtension.class) // Mockito 환경 켜기
 class ProductServiceTest {
 
-    @InjectMocks
+    @InjectMocks // 가짜 DB들을 주입받을 진짜 서비스
     private ProductService productService;
 
-    @Mock
+    @Mock // 가짜 DB 2
     private ProductRepository productRepository;
 
-    @Mock
+    @Mock // 가짜 DB 1
     private MemberRepository memberRepository;
 
     @Test
@@ -118,33 +118,79 @@ class ProductServiceTest {
         assertThat(result.getPrice()).isEqualTo(5000);
     }
 
+    // =========================================================================
+    // 기존 코드를 BDD 스타일으로 교체
+    // =========================================================================
+
     @Test
-    @DisplayName("본인의 상품을 성공적으로 수정할 수 있다.")
+    @DisplayName("성공: 본인의 상품을 정상적으로 업데이트한다.")
     void updateProduct_Success() {
-        // given
-        Member seller = Member.builder().name("판매자").role(Role.SELLER).build();
-        ReflectionTestUtils.setField(seller, "id", 1L); // NullPointerException 방지
+        // Given
+        Long memberId = 1L;
+        Long productId = 100L;
 
-        Product product = Product.builder().name("구상품").price(1000).stock(10).description("구설명").seller(seller).build();
+        // 1. 테스트용 객체 생성 (Setter가 없으므로 ReflectionTestUtils로 강제 ID 주입)
+        Member mockSeller = Member.builder().name("판매자").role(Role.SELLER).build();
+        ReflectionTestUtils.setField(mockSeller, "id", memberId);
 
-        ProductUpdateRequestDto updateDto = new ProductUpdateRequestDto();
-        ReflectionTestUtils.setField(updateDto, "name", "신상품");
-        ReflectionTestUtils.setField(updateDto, "price", 2000);
-        ReflectionTestUtils.setField(updateDto, "stock", 20);
-        ReflectionTestUtils.setField(updateDto, "description", "신설명");
-        ReflectionTestUtils.setField(updateDto, "memberId", seller.getId());
+        Product mockProduct = Product.builder().name("기존상품").price(1000).stock(5).seller(mockSeller).build();
+        ReflectionTestUtils.setField(mockProduct, "id", productId);
 
-        given(memberRepository.findById(any())).willReturn(Optional.of(seller));
-        given(productRepository.findById(1L)).willReturn(Optional.of(product));
+        // 2. 수정 요청용 DTO 세팅
+        ProductUpdateRequestDto requestDto = new ProductUpdateRequestDto();
+        ReflectionTestUtils.setField(requestDto, "memberId", memberId);
+        ReflectionTestUtils.setField(requestDto, "name", "신규상품");
+        ReflectionTestUtils.setField(requestDto, "price", 5000);
+        ReflectionTestUtils.setField(requestDto, "stock", 10);
 
-        // when
-        ProductResponseDto result = productService.updateProduct(1L, updateDto);
+        // 3. BDDMockito 대본 짜기 (Stubbing)
+        // (서비스 내부에서 레포지토리를 찌르면, DB에 가지 말고 내가 만든 mock 객체를 내뱉어라)
+        given(memberRepository.findById(memberId)).willReturn(Optional.of(mockSeller));
+        given(productRepository.findById(productId)).willReturn(Optional.of(mockProduct));
 
-        // then
-        assertThat(result.getName()).isEqualTo("신상품");
-        assertThat(result.getPrice()).isEqualTo(2000);
-        assertThat(product.getStock()).isEqualTo(20);
+        // When
+        ProductResponseDto result = productService.updateProduct(productId, requestDto);
+
+        // Then (검증)
+        assertThat(result.getName()).isEqualTo("신규상품");
+        assertThat(result.getPrice()).isEqualTo(5000);
+        assertThat(result.getStock()).isEqualTo(10);
+
+        // 행동 검증
+        // 이 로직을 타면서 레포지토리의 조회 메서드가 각각 딱 한 번씩 호출되었는지 확인!
+        verify(memberRepository).findById(memberId);
+        verify(productRepository).findById(productId);
     }
+
+    @Test
+    @DisplayName("실패: 본인의 상품이 아니면 예외가 터져야 한다.")
+    void updateProduct_Fail_NotOwner() {
+        // Given
+        Long ownerId = 1L;
+        Long hackerId = 2L; // 남의 상품을 수정하려는 해커
+        Long productId = 100L;
+
+        Member owner = Member.builder().name("주인").build();
+        ReflectionTestUtils.setField(owner, "id", ownerId);
+
+        Member hacker = Member.builder().name("해커").build();
+        ReflectionTestUtils.setField(hacker, "id", hackerId);
+
+        Product mockProduct = Product.builder().seller(owner).build();
+
+        ProductUpdateRequestDto requestDto = new ProductUpdateRequestDto();
+        ReflectionTestUtils.setField(requestDto, "memberId", hackerId); // 해커의 ID로 수정 요청
+
+        given(memberRepository.findById(hackerId)).willReturn(Optional.of(hacker));
+        given(productRepository.findById(productId)).willReturn(Optional.of(mockProduct));
+
+        // When & Then (예외 검증)
+        assertThatThrownBy(() -> productService.updateProduct(productId, requestDto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("본인의 상품만 수정할 수 있습니다."); // 예외 메시지 확인
+    }
+
+    // =========================================================================
 
     @Test
     @DisplayName("본인이 등록한 상품을 성공적으로 삭제할 수 있다.")
